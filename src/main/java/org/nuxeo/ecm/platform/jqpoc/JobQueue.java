@@ -7,7 +7,6 @@ import redis.clients.jedis.Jedis;
 import redis.clients.jedis.exceptions.JedisException;
 
 import com.yammer.metrics.Metrics;
-import com.yammer.metrics.core.Counter;
 import com.yammer.metrics.core.Gauge;
 
 /**
@@ -23,10 +22,6 @@ public class JobQueue {
     private final String name;
 
     private final long timeout;
-
-    private long size = -1;
-
-    private long maxSize = -1;
 
     public JobQueue(final String name, long timeout) {
         this.name = name;
@@ -44,9 +39,7 @@ public class JobQueue {
     }
 
     public long addJobId(String jid) {
-        size = jedis.lpush(name, jid);
-        maxSize = Math.max(size, maxSize);
-        return size;
+        return jedis.lpush(name, jid);
     }
 
     public JobRef getJob() {
@@ -93,12 +86,11 @@ public class JobQueue {
     }
 
     public long flush() {
-        size = 0;
         return jedis.del(name);
     }
 
     public long getSize() {
-        return size;
+        return jedis.llen(name);
     }
 
     public void close() {
