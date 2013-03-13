@@ -6,6 +6,10 @@ import org.apache.commons.logging.LogFactory;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.exceptions.JedisException;
 
+import com.yammer.metrics.Metrics;
+import com.yammer.metrics.core.Counter;
+import com.yammer.metrics.core.Gauge;
+
 /**
  * Job Queue
  *
@@ -14,22 +18,35 @@ public class JobQueue {
 
     private static final Log log = LogFactory.getLog(JobQueue.class);
 
-    final private Jedis jedis;
+    private final Jedis jedis;
 
-    final private String name;
+    private final String name;
 
-    final private long timeout;
+    private final long timeout;
+
+    private long size = -1;
+
+    private long maxSize = -1;
 
     public JobQueue(final String name, long timeout) {
         this.name = name;
         this.timeout = timeout;
         log.debug("Creating new JobQueue for: " + name);
         jedis = new Jedis("localhost");
+
+        Metrics.defaultRegistry().newGauge(JobQueue.class, "pending-" + name,
+                new Gauge<Long>() {
+                    @Override
+                    public Long getValue() {
+                        return jedis.llen(name);
+                    }
+                });
     }
 
     public long addJobId(String jid) {
-        long count = jedis.lpush(name, jid);
-        return count;
+        size = jedis.lpush(name, jid);
+        maxSize = Math.max(size, maxSize);
+        return size;
     }
 
     public JobRef getJob() {
@@ -37,6 +54,7 @@ public class JobQueue {
         final String timestamp = String.format("%d", now);
         String key = (String) jedis.eval(
                 "local v = redis.call('RPOP',ARGV[1]) " + //
+                        "if not v then return v end " + //
                         "local nv = v " + //
                         "if not string.find(v,'*') then" + //
                         " v = v..'*'..ARGV[2] end " + //
@@ -71,12 +89,16 @@ public class JobQueue {
     }
 
     public long completedJob(final String key) {
-        log.info("removeing " + key);
         return jedis.lrem(name, 1, key);
     }
 
     public long flush() {
+        size = 0;
         return jedis.del(name);
+    }
+
+    public long getSize() {
+        return size;
     }
 
     public void close() {
