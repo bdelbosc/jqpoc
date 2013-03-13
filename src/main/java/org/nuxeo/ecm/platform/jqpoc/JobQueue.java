@@ -18,29 +18,61 @@ public class JobQueue {
 
     final private String name;
 
-    public JobQueue(final String name) {
-        this.name = name;
-        log.debug("Creating new JobQueue for " + name);
-        jedis = new Jedis("localhost");
+    final private long timeout;
 
+    public JobQueue(final String name, long timeout) {
+        this.name = name;
+        this.timeout = timeout;
+        log.debug("Creating new JobQueue for: " + name);
+        jedis = new Jedis("localhost");
     }
 
-    public long addJob(String jid) {
+    public long addJobId(String jid) {
         long count = jedis.lpush(name, jid);
         return count;
     }
 
-    public String getJob() {
-        final String timestamp = String.format("%.0f",
-                ((double) System.currentTimeMillis()) / 1000);
-        final String jid = (String) jedis.eval(
-                "local v = redis.call('RPOP',ARGV[1]) if not string.find(v,'*') then v = v..'*'..ARGV[2] end redis.call('LPUSH',ARGV[1],v) return v",
-                0, name, timestamp);
-        return jid;
+    public JobRef getJob() {
+        final long now = (long) (System.currentTimeMillis() / 1000);
+        final String timestamp = String.format("%d", now);
+        String key = (String) jedis.eval(
+                "local v = redis.call('RPOP',ARGV[1]) " + //
+                        "local nv = v " + //
+                        "if not string.find(v,'*') then" + //
+                        " v = v..'*'..ARGV[2] end " + //
+                        "redis.call('LPUSH',ARGV[1],v)" + //
+                        "return nv", 0, name, timestamp);
+        final String jid;
+        final String stamp;
+        final JobState state;
+        if (key == null) {
+            // job less
+            jid = stamp = null;
+            state = JobState.NONE;
+        } else {
+            final int pos = key.indexOf('*');
+            if (pos <= 0) {
+                jid = key;
+                stamp = timestamp;
+                key = jid + "*" + stamp;
+                state = JobState.READY;
+            } else {
+                jid = key.substring(0, pos);
+                stamp = key.substring(pos + 1);
+                if (now - Long.valueOf(stamp) < timeout) {
+                    state = JobState.PROCESSING;
+                } else {
+                    state = JobState.TIMEDOUT;
+                }
+            }
+        }
+        return new JobRef(key, jid, stamp, state);
+
     }
 
-    public long completedJob(final String jid) {
-        return jedis.lrem(name, 1, jid);
+    public long completedJob(final String key) {
+        log.info("removeing " + key);
+        return jedis.lrem(name, 1, key);
     }
 
     public long flush() {
@@ -48,7 +80,7 @@ public class JobQueue {
     }
 
     public void close() {
-        log.debug("Disconnecting from JobQueue" + name);
+        log.debug("Disconnecting from JobQueue: " + name);
         if (jedis != null) {
             try {
                 jedis.disconnect();
