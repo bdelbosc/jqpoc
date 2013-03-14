@@ -25,7 +25,8 @@ Getting the size of pending job:
 Getting the size of running jobs:
 
 	long running = queue.getRunningJob();
-	
+
+
 TODO: Get completed and errors jobs
 
 TODO: being able to configure redis access
@@ -57,8 +58,8 @@ The consumer has to impl the following pattern:
 - If a job is in a READY state, the consumer process it.
   On successful completion it calls:
   
-	  queue.completedJob(job.getKey());
-	  
+        queue.completedJob(job.getKey());
+
   On failure TODO
      
   
@@ -69,7 +70,7 @@ The consumer has to impl the following pattern:
   application-specific way the state of the job, and decide to 
   cancel or resumbit the job in an atomic way:
 
-    JobRef newJob = queue.resumeJob(job.getKey());
+        JobRef newJob = queue.resumeJob(job.getKey());
 
 
 - If there are no job (NONE state) then the worker can sleep.
@@ -77,21 +78,19 @@ The consumer has to impl the following pattern:
 
 ## Requierment 
 
-- Redis 2.6 to get LUA support
+- Redis 2.6 to get LUA support:
 
-
-     wget http://redis.googlecode.com/files/redis-2.6.11.tar.gz
-     tar xzf redis-2.6.11.tar.gz
-     cd redis-2.6.11
-     make
+        wget http://redis.googlecode.com/files/redis-2.6.11.tar.gz
+        tar xzf redis-2.6.11.tar.gz
+        cd redis-2.6.11
+        make
 
 
 - Jedis 2.2.0-SNAPSHOT to get eval fixes
 
-
-     git clone https://github.com/xetorthio/jedis.git
-     cd jedis
-     mvn install
+        git clone https://github.com/xetorthio/jedis.git
+        cd jedis
+        mvn install
 
 
 ## Run the poc
