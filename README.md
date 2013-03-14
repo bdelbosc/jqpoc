@@ -43,12 +43,14 @@ It asks for job and get a job reference:
 
 	JobRef job = queue.getJob();
 
+
 The job reference contains the jobid, a redis key and also a state:
 
 - READY: ready to be processed
 - PROCESSING: already processed by another worker
 - TIMEDOUT: the job timedout in processing state
 - NONE: no job in the queue
+
 
 The consumer has to impl the following pattern:
 
@@ -60,32 +62,37 @@ The consumer has to impl the following pattern:
   On failure TODO
      
   
-If a job is in a PROCESSING state, it can ask for another job.
-If it get N jobs in processing state it can sleep a bit.
+- If a job is in a PROCESSING state, it can ask for another job.
+  If it get N jobs in processing state it can sleep a bit.
 
-If a job is in a TIMEDOUT state, the worker can check in an
-application-specific way, and if the job is still to process choose to
-remove/add (atomic) a new job on the queue.
+- If a job is in a TIMEDOUT state, the worker can check in an
+  application-specific way the state of the job, and decide to 
+  cancel or resumbit the job in an atomic way:
 
-	JobRef newJob = queue.resumeJob(job.getKey());
+    JobRef newJob = queue.resumeJob(job.getKey());
 
 
-If there are no job (NONE state) then the worker can sleep.
+- If there are no job (NONE state) then the worker can sleep.
+
 
 ## Requierment 
 
 - Redis 2.6 to get LUA support
 
-    wget http://redis.googlecode.com/files/redis-2.6.11.tar.gz
-    tar xzf redis-2.6.11.tar.gz
-    cd redis-2.6.11
-    make
+
+     wget http://redis.googlecode.com/files/redis-2.6.11.tar.gz
+     tar xzf redis-2.6.11.tar.gz
+     cd redis-2.6.11
+     make
+
 
 - Jedis 2.2.0-SNAPSHOT to get eval fixes
 
-	git clone https://github.com/xetorthio/jedis.git
-	cd jedis
-	mvn install
+
+     git clone https://github.com/xetorthio/jedis.git
+     cd jedis
+     mvn install
+
 
 ## Run the poc
 
