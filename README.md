@@ -100,8 +100,8 @@ and Run as Java application.
 
 Same for Consumer.java edit and run.
 
-Note that there are Metrics Graphite reporter to trace the size of the
-pending jobs.
+Note that there are Metrics configured to report pending jobs queue on a
+Graphite server.
 
 
 ## References

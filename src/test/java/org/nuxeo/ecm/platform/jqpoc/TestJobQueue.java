@@ -15,17 +15,12 @@ public class TestJobQueue extends TestCase {
     public void testJobQueue() throws InterruptedException {
         JobQueue q = new JobQueue("foo", 1);
         try {
-
             q.flush();
 
-
-            JobRef x = q.getJob();
-
             long count;
-            count = q.addJobId("j1");
+            count = q.addJobIds("j1");
             assertEquals(1, count);
-            count = q.addJobId("j2");
-            count = q.addJobId("j3");
+            count = q.addJobIds("j2", "j3");
             assertEquals(3, count);
 
             JobRef ref;
@@ -39,7 +34,7 @@ public class TestJobQueue extends TestCase {
             assertEquals("j3", ref.getId());
             assertEquals(JobState.READY, ref.getState());
 
-            ref = q.getJob();  // j1
+            ref = q.getJob(); // j1
             assertEquals(j1.getKey(), ref.getKey());
             assertEquals(JobState.PROCESSING, ref.getState());
 
@@ -62,7 +57,7 @@ public class TestJobQueue extends TestCase {
             ref = q.getJob();
             assertEquals(JobState.NONE, ref.getState());
 
-            q.addJobId("j4");
+            q.addJobIds("j4");
             count = q.flush();
             assertEquals(1, count);
             count = q.flush();

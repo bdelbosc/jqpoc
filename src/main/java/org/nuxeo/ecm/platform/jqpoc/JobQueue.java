@@ -38,8 +38,8 @@ public class JobQueue {
                 });
     }
 
-    public long addJobId(String jid) {
-        return jedis.lpush(name, jid);
+    public long addJobIds(String... jids) {
+        return jedis.lpush(name, jids);
     }
 
     public JobRef getJob() {

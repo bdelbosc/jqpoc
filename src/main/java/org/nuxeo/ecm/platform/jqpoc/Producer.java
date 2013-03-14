@@ -15,9 +15,9 @@ import com.yammer.metrics.graphite.GraphiteReporter;
 public class Producer {
     private static final Log log = LogFactory.getLog(Producer.class);
 
-    private static final int NJOBS = 1000000;
+    private static final int NJOBS = 10000000;
 
-    private static final int NTHREDS = 6;
+    private static final int NTHREDS = 1;
 
     private static final int TIMEOUT = 10;
 
@@ -27,6 +27,8 @@ public class Producer {
 
     protected final static Timer producerTimer = Metrics.defaultRegistry().newTimer(
             Producer.class, "producer", TimeUnit.MICROSECONDS, TimeUnit.SECONDS);
+
+    private static final int BUCKET = 500;
 
     public static void main(String[] args) {
 
@@ -42,7 +44,7 @@ public class Producer {
         for (int i = 0; i < NTHREDS; i++) {
             Runnable worker = new ProducerRunnable(PREFIX_JID
                     + Integer.valueOf(i).toString(), QUEUE_NAME,
-                    (long) (NJOBS / NTHREDS));
+                    (long) (NJOBS / NTHREDS), BUCKET);
             executor.execute(worker);
         }
         log.info("Producer running");
