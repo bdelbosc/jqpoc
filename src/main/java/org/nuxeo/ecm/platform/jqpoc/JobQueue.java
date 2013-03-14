@@ -23,11 +23,23 @@ public class JobQueue {
 
     private final long timeout;
 
+    private static final String ADDJOB_SCRIPT = "local v = redis.call('RPOP',ARGV[1]) "
+            + //
+            "if not v then return v end " + //
+            "local nv = v " + //
+            "if not string.find(v,'*') then" + //
+            " v = v..'*'..ARGV[2] end " + //
+            "redis.call('LPUSH',ARGV[1],v)" + //
+            "return nv";
+
+    private final String addJobScriptSha;
+
     public JobQueue(final String name, long timeout) {
         this.name = name;
         this.timeout = timeout;
         log.debug("Creating new JobQueue for: " + name);
         jedis = new Jedis("localhost");
+        addJobScriptSha = jedis.scriptLoad(ADDJOB_SCRIPT);
 
         Metrics.defaultRegistry().newGauge(JobQueue.class, "pending-" + name,
                 new Gauge<Long>() {
@@ -45,14 +57,7 @@ public class JobQueue {
     public JobRef getJob() {
         final long now = (long) (System.currentTimeMillis() / 1000);
         final String timestamp = String.format("%d", now);
-        String key = (String) jedis.eval(
-                "local v = redis.call('RPOP',ARGV[1]) " + //
-                        "if not v then return v end " + //
-                        "local nv = v " + //
-                        "if not string.find(v,'*') then" + //
-                        " v = v..'*'..ARGV[2] end " + //
-                        "redis.call('LPUSH',ARGV[1],v)" + //
-                        "return nv", 0, name, timestamp);
+        String key = (String) jedis.evalsha(addJobScriptSha, 0, name, timestamp);
         final String jid;
         final String stamp;
         final JobState state;
