@@ -31,7 +31,7 @@ public class Consumer {
         ExecutorService executor = Executors.newFixedThreadPool(NTHREDS);
 
         JobQueue queue = new JobQueue(QUEUE_NAME, 10);
-        long size = queue.getSize();
+        long size = queue.getPendingJobCount();
         log.info("Starting " + NTHREDS + " threads of consumers, pending job: "
                 + size);
         TimerContext clock = consumerTimer.time();
@@ -48,7 +48,7 @@ public class Consumer {
                 double rate = (size / (double) elapsed) * 1000000000;
         log.info(String.format(
                 "All consumers finished, queue size=%d rate=%.0f j/s elapsed=%.3f s",
-                queue.getSize(), rate, elapsed / (double) 1000000000));
+                queue.getPendingJobCount(), rate, elapsed / (double) 1000000000));
     }
 
 }

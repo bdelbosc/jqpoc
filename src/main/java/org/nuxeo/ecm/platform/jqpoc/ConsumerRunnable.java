@@ -25,7 +25,7 @@ public class ConsumerRunnable implements Runnable {
                     return;
                 }
                 if (job.getState() == JobState.READY) {
-                    queue.completedJob(job.getKey());
+                    queue.jobDone(job.getKey());
                 }
             } while (job.getState() != JobState.NONE);
         } finally {

@@ -38,10 +38,11 @@ public class TestJobQueue extends TestCase {
             assertEquals(j1.getKey(), ref.getKey());
             assertEquals(JobState.PROCESSING, ref.getState());
 
-            count = q.completedJob(ref.getKey());
+            count = q.jobFailure(ref.getKey(), "Error on job");
             assertEquals(1, count);
+            assertEquals(1, q.getJobInErrorCount());
 
-            count = q.completedJob(ref.getKey());
+            count = q.jobDone(ref.getKey());
             assertEquals(0, count); // already removed
 
             Thread.sleep(2000L);
@@ -50,7 +51,7 @@ public class TestJobQueue extends TestCase {
                 ref = q.getJob();
                 log.info(ref);
                 assertEquals(JobState.TIMEDOUT, ref.getState());
-                count = q.completedJob(ref.getKey());
+                count = q.jobDone(ref.getKey());
                 assertEquals(1, count);
             }
 
@@ -58,7 +59,14 @@ public class TestJobQueue extends TestCase {
             assertEquals(JobState.NONE, ref.getState());
 
             q.addJobIds("j4");
+            assertEquals(4, q.getCompletedJobCount());
+            assertEquals(1, q.getPendingJobCount());
+            assertEquals(0, q.getRunningJobCount());
             count = q.flush();
+            assertEquals(0, q.getCompletedJobCount());
+            assertEquals(0, q.getPendingJobCount());
+            assertEquals(0, q.getRunningJobCount());
+
             assertEquals(1, count);
             count = q.flush();
             assertEquals(0, count);

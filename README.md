@@ -1,13 +1,15 @@
-# Job Queue POC using Redis
+# POC Java Job Queue using Redis
 
+This is a proof of concept to evaluate reliable job queue using Redis.
 
-This is a POC to test reliable job queue using Redis.
+The "reliability" is done using Redis Lua script to create atomc
+primitive.
 
-It uses Lua script to ensure atomic primitive.
-
-In this poc there are only producer and consumer and they only push
+In this POC there are only producer and consumer and they only push
 IDs, it's up to the consumer to agree with the producer about what
 this IDs really mean.
+
+A job that is not completed stay for ever in the list.
 
 
 ### Creating a queue
@@ -17,26 +19,34 @@ A queue as a name and a timeout for job completion:
     JobQueue queue = new JobQueue(queueName, timeout);
 
 
-Getting the size of pending job:
+Getting the number of pending and running job:
 
-    long pending = queue.getSize();
-	
-
-Getting the size of running jobs:
-
-	long running = queue.getRunningJob();
+    long pending = queue.getPendingJobCount();
 
 
-TODO: Get completed and errors jobs
+Getting the number of running jobs:
+
+	long running = queue.getRunningJobCount();
+
+Get the total number of jobs completed including those in failure:
+
+	long completed = queue.getCompletedJobCount():
+
+Get the number of jobs in failure:
+
+	long error = queue.getJobInErrorCount();
+
+TODO: Get the list of errors
 
 TODO: being able to configure redis access
 
 
 ### Producer
 
-Producer just put job id: 
+Producer just put job id:
 
-	queue.addJobId("myJobId1");
+	queue.addJobIds("myJobId1");
+    pendingCount = queue.addJobIds("myJobId2", "myJobId3");
 
 ### Consumer
 
@@ -48,7 +58,7 @@ It asks for job and get a job reference:
 The job reference contains the jobid, a redis key and also a state:
 
 - READY: ready to be processed
-- PROCESSING: already processed by another worker
+- PROCESSING: the job is processing by another worker
 - TIMEDOUT: the job timedout in processing state
 - NONE: no job in the queue
 
@@ -57,26 +67,28 @@ The consumer has to impl the following pattern:
 
 - If a job is in a READY state, the consumer process it.
   On successful completion it calls:
-  
-        queue.completedJob(job.getKey());
 
-  On failure TODO
-     
-  
-- If a job is in a PROCESSING state, it can ask for another job.
-  If it get N jobs in processing state it can sleep a bit.
+        queue.jobDone(job.getKey());
+
+  On failure it calls:
+
+        queue.jobFailure(job.getKey(), "Some error message");
+
+- If a job is in a PROCESSING state, the worker can ask for another
+  job. After N job in PROCESSING state it can have a rest doing a
+  small pause.
 
 - If a job is in a TIMEDOUT state, the worker can check in an
-  application-specific way the state of the job, and decide to 
+  application-specific way the state of the job, and decide to
   cancel or resumbit the job in an atomic way:
 
-        JobRef newJob = queue.resumeJob(job.getKey());
+       TODO: JobRef newJob = queue.resumeJob(job.getKey());
+
+- If there are no job (NONE state) then the worker can have small
+  rest.
 
 
-- If there are no job (NONE state) then the worker can sleep.
-
-
-## Requierment 
+## Requierment
 
 - Redis 2.6 to get LUA support:
 

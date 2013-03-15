@@ -15,7 +15,7 @@ import com.yammer.metrics.graphite.GraphiteReporter;
 public class Producer {
     private static final Log log = LogFactory.getLog(Producer.class);
 
-    private static final int NJOBS = 10000000;
+    private static final int NJOBS = 1000000;
 
     private static final int NTHREDS = 1;
 
@@ -56,7 +56,7 @@ public class Producer {
         double rate = (NJOBS / (double) elapsed) * 1000000000;
         log.info(String.format(
                 "All producer finished, queue size=%d rate=%.0f j/s elapsed=%.3f s",
-                q.getSize(), rate, elapsed / (double) 1000000000));
+                q.getPendingJobCount(), rate, elapsed / (double) 1000000000));
         q.close();
     }
 
