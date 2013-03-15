@@ -11,12 +11,13 @@ this IDs really mean.
 
 A job that is not completed stay for ever in the list.
 
+## API
 
 ### Creating a queue
 
 A queue as a name and a timeout for job completion:
 
-    JobQueue queue = new JobQueue(queueName, timeout);
+    JobQueue queue = new JobQueue("localhost", 6379, queueName, timeout);
 
 
 Getting the number of pending and running job:
@@ -26,33 +27,35 @@ Getting the number of pending and running job:
 
 Getting the number of running jobs:
 
-	long running = queue.getRunningJobCount();
+    long running = queue.getRunningJobCount();
 
 Get the total number of jobs completed including those in failure:
 
-	long completed = queue.getCompletedJobCount():
+    long completed = queue.getCompletedJobCount():
 
 Get the number of jobs in failure:
 
-	long error = queue.getJobInErrorCount();
+    long error = queue.getJobInErrorCount();
+
+Drop a queue removing all the persisted data:
+
+    queue.drop();
 
 TODO: Get the list of errors
-
-TODO: being able to configure redis access
 
 
 ### Producer
 
 Producer just put job IDs:
 
-	queue.addJobIds("myJobId1");
+    queue.addJobIds("myJobId1");
     pendingCount = queue.addJobIds("myJobId2", "myJobId3");
 
 ### Consumer
 
 It asks for job and get a job reference:
 
-	JobRef job = queue.getJob();
+    JobRef job = queue.getJob();
 
 
 The job reference contains the jobid, a redis key and also a state:
@@ -86,6 +89,54 @@ The consumer has to impl the following pattern:
 
 - If there are no job (NONE state) then the worker can have small
   rest.
+
+### Thread safety
+
+The JobQueue use a dedicated Jedis connection which is not thread safe.
+This means that JobQueue is not thread safe and should not be shared.
+Each worker has to create its own JobQueue.
+
+Using a Jedis connection pool may make the JobQueue thread safe.  But
+the poc is focused on the maximum throughput on producer/worker and in
+this case it is better to have one connection per producer/worker so
+there are no contention on the connection pool.
+
+## Redis data
+
+Here is the list of data stored in Redis for a queue named <QUEUE_NAME>:
+
+- <QUEUE_NAME> The name of the queue is a redis list of pending job
+  IDs the running one renamed into JOBID*UNIXTIMESTAMP, this is the
+  refered as the job key.
+
+- run:<QUEUE_NAME> A list of job keys that are in processing state.
+
+- done:<QUEUE_NAME> A counter of completed job (including failures).
+
+- error:<QUEUE_NAME> A counter of job in failure.
+
+- errlst:<QUEUE_NAME> A list of the last N last errors including job keys
+  and messages.
+
+
+Using redis-cli you can asusming the queue name is foo:
+
+    # queue size
+    redis 127.0.0.1:6379> llen foo
+    (integer) 3
+    # list running keys
+    redis 127.0.0.1:6379> lrange run:foo 0 -1
+    1) "j3*1363343422"
+    2) "j2*1363343422"
+    redis 127.0.0.1:6379> llen run:foo
+    (integer) 2
+    # get error count
+    redis 127.0.0.1:6379> llen error:foo
+    (integer) 1
+	# get error list
+    lrange  errlst:foo 0 -1
+    1) "j1*1363343843:Error on job"
+
 
 
 ## Requirement

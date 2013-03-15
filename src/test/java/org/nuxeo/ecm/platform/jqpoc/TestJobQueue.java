@@ -13,9 +13,9 @@ public class TestJobQueue extends TestCase {
     private static final Log log = LogFactory.getLog(TestJobQueue.class);
 
     public void testJobQueue() throws InterruptedException {
-        JobQueue q = new JobQueue("foo", 1);
+        JobQueue q = new JobQueue("localhost", 6379, "foo", 1);
         try {
-            q.flush();
+            q.drop();
 
             long count;
             count = q.addJobIds("j1");
@@ -45,6 +45,7 @@ public class TestJobQueue extends TestCase {
             count = q.jobDone(ref.getKey());
             assertEquals(0, count); // already removed
 
+
             Thread.sleep(2000L);
 
             for (int i = 0; i < 2; i++) {
@@ -62,13 +63,13 @@ public class TestJobQueue extends TestCase {
             assertEquals(4, q.getCompletedJobCount());
             assertEquals(1, q.getPendingJobCount());
             assertEquals(0, q.getRunningJobCount());
-            count = q.flush();
+            count = q.drop();
             assertEquals(0, q.getCompletedJobCount());
             assertEquals(0, q.getPendingJobCount());
             assertEquals(0, q.getRunningJobCount());
 
             assertEquals(1, count);
-            count = q.flush();
+            count = q.drop();
             assertEquals(0, count);
 
         } finally {

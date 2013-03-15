@@ -12,6 +12,7 @@ import com.yammer.metrics.core.Gauge;
 /**
  * Job Queue
  *
+ * Not thread safe because it uses a non thread safe jedis connection.
  */
 public class JobQueue {
 
@@ -36,19 +37,37 @@ public class JobQueue {
             "redis.call('INCR','done:'..ARGV[1]) " + //
             "if ARGV[3] then" + //
             " redis.call('INCR','error:'..ARGV[1])" + //
-            " redis.call('LPUSH','err:'..ARGV[1],ARGV[2]..':'..ARGV[3])" + //
-            " redis.call('LTRIM','err:'..ARGV[1],0,99) " + //
+            " redis.call('LPUSH','errlst:'..ARGV[1],ARGV[2]..':'..ARGV[3])" + //
+            " redis.call('LTRIM','errlst:'..ARGV[1],0,99) " + //
             "end return ret";
 
     private final String addJobScriptSha;
 
     private final String completedScriptSha;
 
-    public JobQueue(final String name, long timeout) {
+    private final String host;
+
+    private final int port;
+
+    /**
+     * Creating a JobQueue
+     *
+     * @param host the redis host
+     * @param port the redis port default is 6379
+     * @param name the name of the queue
+     * @param timeout the maximum time a job can stay in processing state
+     */
+    public JobQueue(final String host, final int port, final String name,
+            final long timeout) {
+        this.host = host;
+        this.port = port;
         this.name = name;
         this.timeout = timeout;
-        log.debug("Creating new JobQueue for: " + name);
-        jedis = new Jedis("localhost");
+        if (log.isDebugEnabled()) {
+            log.debug("Creating JobQueue: " + name + ", timeout: " + timeout
+                    + "s using redis " + host + ":" + port);
+        }
+        jedis = new Jedis(host, port);
         addJobScriptSha = jedis.scriptLoad(ADDJOB_SCRIPT);
         completedScriptSha = jedis.scriptLoad(COMPLETED_SCRIPT);
 
@@ -68,7 +87,7 @@ public class JobQueue {
                     }
                 });
 
-        Metrics.defaultRegistry().newGauge(JobQueue.class, "done-" + name,
+        Metrics.defaultRegistry().newGauge(JobQueue.class, "completed-" + name,
                 new Gauge<Long>() {
                     @Override
                     public Long getValue() {
@@ -87,7 +106,7 @@ public class JobQueue {
     }
 
     /**
-     * Add a list of job ids to the queue.
+     * Add a list of job IDs to the queue.
      *
      * It's up to the consumer to agree with the producer about what this IDs
      * really mean
@@ -162,12 +181,12 @@ public class JobQueue {
     }
 
     /**
-     * Reset the queue.
+     * Remove all the data concerning the queue.
      *
      * @return 0 on failure
      */
-    public long flush() {
-        jedis.del("err:" + name);
+    public long drop() {
+        jedis.del("errlst:" + name);
         jedis.del("error:" + name);
         jedis.del("done:" + name);
         jedis.del("run:" + name);
@@ -228,7 +247,10 @@ public class JobQueue {
      *
      */
     public void close() {
-        log.debug("Disconnecting from JobQueue: " + name);
+        if (log.isDebugEnabled()) {
+            log.debug("Disconnecting JobQueue: " + name + " form redis " + host
+                    + ":" + port);
+        }
         if (jedis != null) {
             try {
                 jedis.disconnect();

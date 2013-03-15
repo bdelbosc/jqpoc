@@ -13,7 +13,12 @@ import com.yammer.metrics.core.TimerContext;
 import com.yammer.metrics.graphite.GraphiteReporter;
 
 public class Producer {
+
     private static final Log log = LogFactory.getLog(Producer.class);
+
+    private static final String HOST ="localhost";
+
+    private static final int PORT = 6379;
 
     private static final int NJOBS = 1000000;
 
@@ -38,11 +43,11 @@ public class Producer {
         ExecutorService executor = Executors.newFixedThreadPool(NTHREDS);
         log.info("Starting " + NTHREDS + " threads of producers");
 
-        JobQueue q = new JobQueue(QUEUE_NAME, TIMEOUT);
-        q.flush();
+        JobQueue q = new JobQueue(HOST, PORT, QUEUE_NAME, TIMEOUT);
+        q.drop();
         TimerContext clock = producerTimer.time();
         for (int i = 0; i < NTHREDS; i++) {
-            Runnable worker = new ProducerRunnable(PREFIX_JID
+            Runnable worker = new ProducerRunnable(HOST, PORT, PREFIX_JID
                     + Integer.valueOf(i).toString(), QUEUE_NAME,
                     (long) (NJOBS / NTHREDS), BUCKET);
             executor.execute(worker);
