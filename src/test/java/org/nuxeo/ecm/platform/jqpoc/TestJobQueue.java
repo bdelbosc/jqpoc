@@ -52,6 +52,8 @@ public class TestJobQueue extends TestCase {
         assertEquals(0, q.getPendingJobCount());
         assertEquals(0, q.getRunningJobCount());
         assertEquals(0, q.getResumeJobCount());
+        assertEquals(null, q.getLastFailure());
+        assertEquals(null, q.getFailure(10));
 
         JobRef j = q.getJob();
         assertEquals(JobState.NONE, j.getState());
@@ -93,7 +95,8 @@ public class TestJobQueue extends TestCase {
         q.addJobIds("j1");
         j = q.getJob();
         assertEquals(1, q.getRunningJobCount());
-        ret = q.jobFailure(j.getKey(), "Error message");
+        String msg = "Error message";
+        ret = q.jobFailure(j.getKey(), msg);
         assertEquals(1, ret);
         ret = q.jobFailure(j.getKey(), "Error message bis not allowed");
         assertEquals(0, ret);
@@ -102,6 +105,12 @@ public class TestJobQueue extends TestCase {
         assertEquals(0, ret);
         assertEquals(1, q.getFailureJobCount());
         assertEquals(2, q.getCompletedJobCount());
+
+        JobFailure f = q.getLastFailure();
+        assertNotNull(f);
+        assertEquals(msg, f.getMessage());
+        assertEquals(f.getId(), "j1");
+        log.info(f);
     }
 
     public void testJobResume() throws InterruptedException {

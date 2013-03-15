@@ -47,7 +47,7 @@ public class JobQueue {
             + "redis.call('INCR','done:'..ARGV[1]) " //
             + "if ARGV[3] then" //
             + " redis.call('INCR','error:'..ARGV[1])" //
-            + " redis.call('LPUSH','errlst:'..ARGV[1],ARGV[2]..':'..ARGV[3])" //
+            + " redis.call('LPUSH','errlst:'..ARGV[1],ARGV[2]..'*'..ARGV[3])" //
             + " redis.call('LTRIM','errlst:'..ARGV[1],0,99) " //
             + "end return r";
 
@@ -219,6 +219,30 @@ public class JobQueue {
         jedis.del("run:" + name);
         jedis.del("resume:" + name);
         return jedis.del(name);
+    }
+
+    /**
+     * Return the last failure info or null if there are no failure.
+     */
+    public JobFailure getLastFailure() {
+        return getFailure(0);
+    }
+
+    /**
+     * Get failure at specified index.
+     *
+     * Return null if there are no failure.
+     *
+     * @param index 0 means the latest error
+     */
+    public JobFailure getFailure(int index) {
+        String ret = jedis.lindex("errlst:" + name, index);
+        if (ret == null) {
+            return null;
+        }
+        String[] split = ret.split("\\*");
+        return new JobFailure(split[0] + '*' + split[1], split[0], split[1],
+                split[2]);
     }
 
     /**

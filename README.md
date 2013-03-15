@@ -13,9 +13,9 @@ A job that is not completed stay for ever in the list.
 
 ## API
 
-### Creating a queue
+### Managing the queue
 
-Define a queue with a name and a timeout for job completion:
+Create or join a queue, set a timeout for job completion:
 
     JobQueue queue = new JobQueue("localhost", 6379, queueName, timeout);
 
@@ -23,7 +23,6 @@ Define a queue with a name and a timeout for job completion:
 Getting the number of pending and running job:
 
     long pending = queue.getPendingJobCount();
-
 
 Getting the number of running jobs:
 
@@ -41,7 +40,13 @@ Drop a queue removing all the persisted data:
 
     queue.drop();
 
-TODO: Get the list of errors
+Get the failure info:
+
+    JobFailure fail = queue.getLastFailure();
+	log.error("Failure on job id " + fail.getJobId() + ": " + fail.getMessage());
+	JobFailure fail2  = queue.getFailure(1)
+
+The queue keep only the 100 latest error information
 
 Diconnecting
 
@@ -56,18 +61,17 @@ Producer just put job IDs:
 
 ### Consumer
 
-It asks for job and get a job reference:
+Consumer worker asks for job:
 
     JobRef job = queue.getJob();
 
-
-The job reference contains the jobid, a redis key and also a state:
+The job reference contains the job ID, a redis key, a time stamp
+and it has a state:
 
 - READY: ready to be processed
 - PROCESSING: the job is processing by another worker
 - TIMEDOUT: the job timed out in processing state
 - NONE: no job in the queue
-
 
 The consumer has to impl the following pattern:
 
@@ -88,9 +92,9 @@ The consumer has to impl the following pattern:
   rest.
 
 - If a job is in a TIMEDOUT state, the worker can check in an
-  application-specific way the state of the job, and complete
-  the state of the job with jobDone or jobFailure. The worker
-  can also decide to process the job calling resumeJob:
+  application-specific way the state of the job and choose to complete
+  the state of the job using jobDone or jobFailure API. The worker can
+  also decide to process the job:
 
        JobRef newJob = queue.resumeJob(job.getKey());
 
@@ -101,7 +105,7 @@ The consumer has to impl the following pattern:
 ### Thread safety
 
 The JobQueue use a dedicated Jedis connection which is not thread safe.
-This means that JobQueue is not thread safe and should not be shared.
+This means that JobQueue is not thread safe.
 Each worker has to create its own JobQueue.
 
 Using a Jedis connection pool may make the JobQueue thread safe.  But
@@ -111,23 +115,23 @@ there are no contention on the connection pool.
 
 ## Redis data
 
-Here is the list of data stored in Redis for a queue named <QUEUE_NAME>:
+Here is the list of data stored in Redis for a queue named QNAME:
 
-QUEUE_NAME
+QNAME
 : The name of the queue is a redis list of pending job IDs the running
   one renamed into JOBID*UNIXTIMESTAMP, this is the refered as the job
   key.
 
-run:QUEUE_NAME
+run:QNAME
 : A list of job keys that are in processing state.
 
-done:QUEUE_NAME
+done:QNAME
 : A counter of completed job (including failures).
 
-error:QUEUE_NAME
+error:QNAME
 : A counter of job in failure.
 
-errlst:QUEUE_NAME
+errlst:QNAME
 : A list of the last N last errors including job keys and messages.
 
 
@@ -148,7 +152,7 @@ queue is 'foo':
     (integer) 1
 	# get error list
     lrange  errlst:foo 0 -1
-    1) "j1*1363343843:Error on job"
+    1) "j1*1363343843*Error on job"
 
 ## Limitations
 
