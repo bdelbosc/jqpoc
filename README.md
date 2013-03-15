@@ -105,21 +105,26 @@ there are no contention on the connection pool.
 
 Here is the list of data stored in Redis for a queue named <QUEUE_NAME>:
 
-- <QUEUE_NAME> The name of the queue is a redis list of pending job
-  IDs the running one renamed into JOBID*UNIXTIMESTAMP, this is the
-  refered as the job key.
+QUEUE_NAME
+: The name of the queue is a redis list of pending job IDs the running
+  one renamed into JOBID*UNIXTIMESTAMP, this is the refered as the job
+  key.
 
-- run:<QUEUE_NAME> A list of job keys that are in processing state.
+run:QUEUE_NAME
+: A list of job keys that are in processing state.
 
-- done:<QUEUE_NAME> A counter of completed job (including failures).
+done:QUEUE_NAME
+: A counter of completed job (including failures).
 
-- error:<QUEUE_NAME> A counter of job in failure.
+error:QUEUE_NAME
+: A counter of job in failure.
 
-- errlst:<QUEUE_NAME> A list of the last N last errors including job keys
-  and messages.
+errlst:QUEUE_NAME
+: A list of the last N last errors including job keys and messages.
 
 
-Using redis-cli you can asusming the queue name is foo:
+You can view the data using redis-cli, for instance if the name of the
+queue is 'foo':
 
     # queue size
     redis 127.0.0.1:6379> llen foo
