@@ -2,7 +2,7 @@
 
 This is a proof of concept to evaluate reliable job queue using Redis.
 
-The "reliability" is done using Redis Lua script to create atomc
+The "reliability" is done using Redis Lua script to create atomic
 primitive.
 
 In this POC there are only producer and consumer and they only push
@@ -43,7 +43,7 @@ TODO: being able to configure redis access
 
 ### Producer
 
-Producer just put job id:
+Producer just put job IDs:
 
 	queue.addJobIds("myJobId1");
     pendingCount = queue.addJobIds("myJobId2", "myJobId3");
@@ -59,7 +59,7 @@ The job reference contains the jobid, a redis key and also a state:
 
 - READY: ready to be processed
 - PROCESSING: the job is processing by another worker
-- TIMEDOUT: the job timedout in processing state
+- TIMEDOUT: the job timed out in processing state
 - NONE: no job in the queue
 
 
@@ -75,7 +75,7 @@ The consumer has to impl the following pattern:
         queue.jobFailure(job.getKey(), "Some error message");
 
 - If a job is in a PROCESSING state, the worker can ask for another
-  job. After N job in PROCESSING state it can have a rest doing a
+  job. After N jobs in PROCESSING state it can have a rest doing a
   small pause.
 
 - If a job is in a TIMEDOUT state, the worker can check in an
@@ -88,9 +88,9 @@ The consumer has to impl the following pattern:
   rest.
 
 
-## Requierment
+## Requirement
 
-- Redis 2.6 to get LUA support:
+- Redis 2.6 to get the Lua support:
 
         wget http://redis.googlecode.com/files/redis-2.6.11.tar.gz
         tar xzf redis-2.6.11.tar.gz
@@ -98,7 +98,7 @@ The consumer has to impl the following pattern:
         make
 
 
-- Jedis 2.2.0-SNAPSHOT to get eval fixes
+- Jedis 2.2.0-SNAPSHOT to get evalsha fixes
 
         git clone https://github.com/xetorthio/jedis.git
         cd jedis
@@ -112,7 +112,7 @@ and Run as Java application.
 
 Same for Consumer.java edit and run.
 
-Note that there are Metrics configured to report pending jobs queue on a
+Note that there are Metrics configured to report queue information on a
 Graphite server.
 
 
