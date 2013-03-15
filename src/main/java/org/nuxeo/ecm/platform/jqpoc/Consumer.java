@@ -54,6 +54,7 @@ public class Consumer {
         log.info(String.format(
                 "All consumers finished, queue size=%d rate=%.0f j/s elapsed=%.3f s",
                 queue.getPendingJobCount(), rate, elapsed / (double) 1000000000));
+        queue.disconnect();
     }
 
 }

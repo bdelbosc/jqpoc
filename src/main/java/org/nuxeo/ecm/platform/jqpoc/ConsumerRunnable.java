@@ -35,7 +35,7 @@ public class ConsumerRunnable implements Runnable {
                 }
             } while (job.getState() != JobState.NONE);
         } finally {
-            queue.close();
+            queue.disconnect();
         }
     }
 }

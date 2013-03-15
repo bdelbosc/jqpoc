@@ -24,26 +24,38 @@ public class JobQueue {
 
     private final long timeout;
 
-    private static final String ADDJOB_SCRIPT = "local v = redis.call('RPOP',ARGV[1]) "
-            + "if not v then return v end " + //
-            "local nv = v " + //
-            "if not string.find(v,'*') then" + //
-            " v = v..'*'..ARGV[2] redis.call('LPUSH','run:'..ARGV[1],v) end " + //
-            "redis.call('LPUSH',ARGV[1],v)" + //
-            "return nv";
+    private static final String GETJOB_SCRIPT = "local v = redis.call('RPOP',ARGV[1]) " //
+            + "if not v then return v end " //
+            + "local nv = v " //
+            + "if not string.find(v,'*') then" //
+            + " v = v..'*'..ARGV[2] redis.call('LPUSH','run:'..ARGV[1],v) end " //
+            + "redis.call('LPUSH',ARGV[1],v)" //
+            + "return nv";
 
-    private static final String COMPLETED_SCRIPT = "redis.call('LREM',ARGV[1],1,ARGV[2]) "
-            + "local ret = redis.call('LREM','run:'..ARGV[1],1,ARGV[2]) " + //
-            "redis.call('INCR','done:'..ARGV[1]) " + //
-            "if ARGV[3] then" + //
-            " redis.call('INCR','error:'..ARGV[1])" + //
-            " redis.call('LPUSH','errlst:'..ARGV[1],ARGV[2]..':'..ARGV[3])" + //
-            " redis.call('LTRIM','errlst:'..ARGV[1],0,99) " + //
-            "end return ret";
+    private static final String RESUME_SCRIPT = "local r = redis.call('LREM',ARGV[1],1,ARGV[2]) " //
+            + "if r == 0 then return nil end "
+            + "redis.call('LREM','run:'..ARGV[1],1,ARGV[2]) " //
+            + "redis.call('INCR','resume:'..ARGV[1]) " //
+            + "local v = string.sub(ARGV[2],1,string.find(ARGV[2],'*')-1)..'*'..ARGV[3] " //
+            + "redis.call('LPUSH','run:'..ARGV[1],v) " //
+            + "redis.call('LPUSH',ARGV[1],v)" //
+            + "return v";
 
-    private final String addJobScriptSha;
+    private static final String COMPLETED_SCRIPT = "local r = redis.call('LREM',ARGV[1],1,ARGV[2]) " //
+            + "if r == 0 then return r end "
+            + "redis.call('LREM','run:'..ARGV[1],1,ARGV[2]) " //
+            + "redis.call('INCR','done:'..ARGV[1]) " //
+            + "if ARGV[3] then" //
+            + " redis.call('INCR','error:'..ARGV[1])" //
+            + " redis.call('LPUSH','errlst:'..ARGV[1],ARGV[2]..':'..ARGV[3])" //
+            + " redis.call('LTRIM','errlst:'..ARGV[1],0,99) " //
+            + "end return r";
+
+    private final String getJobScriptSha;
 
     private final String completedScriptSha;
+
+    private final String resumeScriptSha;
 
     private final String host;
 
@@ -68,7 +80,8 @@ public class JobQueue {
                     + "s using redis " + host + ":" + port);
         }
         jedis = new Jedis(host, port);
-        addJobScriptSha = jedis.scriptLoad(ADDJOB_SCRIPT);
+        getJobScriptSha = jedis.scriptLoad(GETJOB_SCRIPT);
+        resumeScriptSha = jedis.scriptLoad(RESUME_SCRIPT);
         completedScriptSha = jedis.scriptLoad(COMPLETED_SCRIPT);
 
         Metrics.defaultRegistry().newGauge(JobQueue.class, "pending-" + name,
@@ -99,7 +112,7 @@ public class JobQueue {
                 new Gauge<Long>() {
                     @Override
                     public Long getValue() {
-                        return getJobInErrorCount();
+                        return getFailureJobCount();
                     }
                 });
 
@@ -128,7 +141,7 @@ public class JobQueue {
     public JobRef getJob() {
         final long now = (long) (System.currentTimeMillis() / 1000);
         final String timestamp = String.format("%d", now);
-        String key = (String) jedis.evalsha(addJobScriptSha, 0, name, timestamp);
+        String key = (String) jedis.evalsha(getJobScriptSha, 0, name, timestamp);
         final String jid;
         final String stamp;
         final JobState state;
@@ -180,6 +193,20 @@ public class JobQueue {
         return (Long) jedis.evalsha(completedScriptSha, 0, name, key, message);
     }
 
+    public JobRef jobResume(final String key) {
+        final long now = (long) (System.currentTimeMillis() / 1000);
+        final String timestamp = String.format("%d", now);
+        final String newKey = (String) jedis.evalsha(resumeScriptSha, 0, name,
+                key, timestamp);
+        if (newKey == null) {
+            // The job has been resumed by another worker
+            return new JobRef(null, null, null, JobState.NONE);
+        }
+        return new JobRef(newKey, newKey.split("\\*")[0], timestamp,
+                JobState.READY);
+
+    }
+
     /**
      * Remove all the data concerning the queue.
      *
@@ -190,6 +217,7 @@ public class JobQueue {
         jedis.del("error:" + name);
         jedis.del("done:" + name);
         jedis.del("run:" + name);
+        jedis.del("resume:" + name);
         return jedis.del(name);
     }
 
@@ -207,13 +235,12 @@ public class JobQueue {
      *
      * @return
      */
-    public long getJobInErrorCount() {
+    public long getFailureJobCount() {
         try {
             return Long.valueOf(jedis.get("error:" + name));
         } catch (NumberFormatException e) {
             return 0;
         }
-
     }
 
     /**
@@ -239,14 +266,25 @@ public class JobQueue {
         } catch (NumberFormatException e) {
             return 0;
         }
+    }
 
+    /**
+     * Get the number of Job that has been timed out and resume.
+     *
+     */
+    public long getResumeJobCount() {
+        try {
+            return Long.valueOf(jedis.get("resume:" + name));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     /**
      * Disconnect from the queue.
      *
      */
-    public void close() {
+    public void disconnect() {
         if (log.isDebugEnabled()) {
             log.debug("Disconnecting JobQueue: " + name + " form redis " + host
                     + ":" + port);

@@ -62,7 +62,7 @@ public class Producer {
         log.info(String.format(
                 "All producer finished, queue size=%d rate=%.0f j/s elapsed=%.3f s",
                 q.getPendingJobCount(), rate, elapsed / (double) 1000000000));
-        q.close();
+        q.disconnect();
     }
 
 }

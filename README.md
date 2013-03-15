@@ -15,7 +15,7 @@ A job that is not completed stay for ever in the list.
 
 ### Creating a queue
 
-A queue as a name and a timeout for job completion:
+Define a queue with a name and a timeout for job completion:
 
     JobQueue queue = new JobQueue("localhost", 6379, queueName, timeout);
 
@@ -35,7 +35,7 @@ Get the total number of jobs completed including those in failure:
 
 Get the number of jobs in failure:
 
-    long error = queue.getJobInErrorCount();
+    long error = queue.getFailureJobCount();
 
 Drop a queue removing all the persisted data:
 
@@ -43,6 +43,9 @@ Drop a queue removing all the persisted data:
 
 TODO: Get the list of errors
 
+Diconnecting
+
+    queue.disconnect()
 
 ### Producer
 
@@ -81,14 +84,19 @@ The consumer has to impl the following pattern:
   job. After N jobs in PROCESSING state it can have a rest doing a
   small pause.
 
-- If a job is in a TIMEDOUT state, the worker can check in an
-  application-specific way the state of the job, and decide to
-  cancel or resumbit the job in an atomic way:
-
-       TODO: JobRef newJob = queue.resumeJob(job.getKey());
-
 - If there are no job (NONE state) then the worker can have small
   rest.
+
+- If a job is in a TIMEDOUT state, the worker can check in an
+  application-specific way the state of the job, and complete
+  the state of the job with jobDone or jobFailure. The worker
+  can also decide to process the job calling resumeJob:
+
+       JobRef newJob = queue.resumeJob(job.getKey());
+
+  This call may return no job (NONE state) if another worker as
+  already taken the duty.
+
 
 ### Thread safety
 
@@ -142,6 +150,13 @@ queue is 'foo':
     lrange  errlst:foo 0 -1
     1) "j1*1363343843:Error on job"
 
+## Limitations
+
+If workers are on different server, servers must be synchronized
+because the timestamp is submited by consumers.
+
+If producers put many times the same IDs, the job will be done many
+times, so it is recommended to make consumer job indempotent.
 
 
 ## Requirement

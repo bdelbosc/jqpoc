@@ -35,7 +35,7 @@ public class ProducerRunnable implements Runnable {
                 queue.addJobIds(ids);
             }
         } finally {
-            queue.close();
+            queue.disconnect();
         }
     }
 }
